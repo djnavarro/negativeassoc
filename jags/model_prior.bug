@@ -1,0 +1,121 @@
+# Somewhat unhappy with this still - it feels like this could be made more
+# principled. 
+smoothness <- 15
+relevancescale <- 1
+tiny <- .5 * smoothness
+
+# Sample the consequential set over the full space using the mutation
+# prior (i.e., correlation between items decays with dissimilarity).
+
+# The one parameter here is "specificity" sig:
+#   - decrease sigma -> the exponential distribution decays faster
+#   - faster decay -> smaller "differences" more likely
+#   - smaller differences -> smoother maps
+#   - smoother maps -> wider generalisation
+
+# Sample an uncorrelated associative map from the independent node prior. 
+# In principle we could use this to push the overall level of generalisation
+# up or down, but for now I don't think it makes sense to do anything other 
+# than fix this to be a uniform distribution
+for(sh in 1:grain) { # shape value
+  for(co in 1:grain) { # colour value
+    association[sh,co,1] ~ dbeta(1,1)
+  }
+  for(ch in 1:grain) { # checker value
+    association[sh,ch,2] ~ dbeta(1,1)
+  }
+}
+
+# Generate the "smoothness" of the associative map. 
+# In principle we might have different smoothing along
+# different timensions, but that's rather pointless in
+# practice because we're using the mutation rate as the
+# tool for driving the differences, so there is only a
+# single global smoothness parameter
+size_smoothness <- smoothness
+check_smoothness <- smoothness
+colour_smoothness <- smoothness
+
+# for dimensions believed to be irrelevant, sample the 
+# mutation rate from a uniform distribution. however, if
+# the dimension is deemed relevant, we expect more finer
+# grained distinctions and hence we need higher mutation 
+# rates
+mutationrate_size ~ dbeta(1+(SZ_relevant * relevancescale), 1)
+mutationrate_check ~ dbeta(1+(CH_relevant * relevancescale), 1)
+mutationrate_colour ~ dbeta(1+(BG_relevant * relevancescale), 1)
+
+# induce an axis-aligned bias
+for(v in 1:grain) {
+  
+  # is this a mutation point?
+  si_sm[v] ~ dbern(mutationrate_size)
+  ch_sm[v] ~ dbern(mutationrate_check)
+  co_sm[v] ~ dbern(mutationrate_colour)
+  
+  # if it's a mutation point then no smoothing here
+  size_smooth[v] <- tiny + smoothness * (1-si_sm[v]) 
+  check_smooth[v] <- tiny + smoothness * (1-ch_sm[v]) 
+  colour_smooth[v] <- tiny + smoothness * (1-co_sm[v])
+}
+
+# sample the smoothness at each edge in the lattice
+for(c in 1:grain) {
+  for(v in 1:2) {
+    for(sh in 1:(grain-1)) {
+      lambda[sh,c,v,1] ~ dexp(1/size_smooth[sh]) # nodes differing on size
+    }
+    lambda[grain,c,v,1] <- 0
+  }
+}
+for(sh in 1:grain) {
+  for(c in 1:(grain-1)) {
+    lambda[sh,c,1,2] ~  dexp(1/colour_smooth[c]) # nodes differing on bluegreen
+    lambda[sh,c,2,2] ~  dexp(1/check_smooth[c]) # nodes differing on checker
+  }
+  lambda[sh,grain,1,2] <- 0
+  lambda[sh,grain,2,2] <- 0
+}
+
+
+# Calculate the difference in associative strength between adjacent nodes/stimuli
+for(c in 1:grain) {
+  for(v in 1:2) {
+    for(sh in 1:(grain-1)) {
+      dist[sh,c,v,1] <- abs(association[sh,c,v]-association[sh+1,c,v]) # size diff
+    }
+    dist[grain,c,v,1] <- 0
+  }
+}
+for(sh in 1:grain) {
+  for(c in 1:(grain-1)) {
+    dist[sh,c,1,2] <- abs(association[sh,c,1]-association[sh,c+1,1]) # bluegreen diff
+    dist[sh,c,2,2] <- abs(association[sh,c,2]-association[sh,c+1,2]) # checker diff
+  }
+  dist[sh,grain,1,2] <- 0
+  dist[sh,grain,2,2] <- 0
+}
+
+# probability of this distance computed using the beta(1,1+lambda) prior. Note that this
+# is a bit of a hack to make JAGS work properly. What I've done is treat each edge as an 
+# observed "1" value, and then created a model in which the probability of a 1 is proportional
+# to a the beta(1,1+lambda) prior. This gives a model where the probability of an
+# edge is proportional to the beta(1,1+lambda) dist. Which seems fine, but as with many other
+# elements to the model it feels like this could be done in a more principled way
+lo <- .00000000001
+for(sh in 1:grain) {
+  for(c in 1:grain) {
+    for(v in 1:2) {
+      for(d in 1:2) {
+        edgeprob[sh,c,v,d] <- lo + (1-lo) * (1-dist[sh,c,v,d])^lambda[sh,c,v,d]
+        edge[sh,c,v,d] ~ dbern(edgeprob[sh,c,v,d])
+      }
+    }
+  }
+}
+
+# for tracking purposes - these are the locations of the test stimuli
+colourvalue <- association[6,,1]
+checkervalue <- association[6,,2]
+shapevalue <- association[,6,1]
+

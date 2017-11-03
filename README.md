@@ -10,3 +10,4 @@ Structure
 - `run19.R` samples from the posterior
 - `drawFigure.R` uses the data files to plot the figure
 - the `.Rdata` files contain results from simulations
+- `generalisation.pdf` is the figure

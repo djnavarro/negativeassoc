@@ -1,0 +1,139 @@
+model {
+  
+  ###########################
+
+  PRIORHERE
+
+  ###########################
+  
+  RELEVANCEHERE
+  
+  ###########################
+  
+  LIKELIHOODHERE
+  
+  ###########################
+  
+  # Content specific to the far CS- condition
+  
+  N <- 11 # number of test items
+  
+  sz1 <- 6 # size of CS+
+  bg1 <- 6 # colour of CS+
+  
+  sz0 <- 6 # size of CS-
+  ch0 <- 6 # checkeredness of CS-
+  
+  # Calculate the likelihood of the CS+ & CS- given what the learner believes about
+  # (a) the relevance of difference stimulus properties, (b) the associative
+  # strength of the stimulus. Note that this likelihood has two parts: the 
+  # probability that the experiment would "choose" this particular stimulus,
+  # and the probability that this stimulus would lead to the "outcome".
+  
+  # The outcome probability is read straight off the map. As a reminder,
+  # 1st index = SZ, 2nd index = value of (BG or CH), 3rd index = TT
+  outcome_CS1 <- association[sz1, bg1, 1]
+  outcome_CS0 <- 1 - association[sz0, ch0, 2]
+  
+  # The model for the "choose" action. In the far CS- condition, participants
+  # are exposed to the full stimulus space, so every feature is potentially
+  # relevant, but there are a few cases that are just bizarre and are deemed
+  # Gricean violations
+  
+  # "nothing is relevant"... assume size, texture type and texture value are
+  # all chosen uniformly at random for both the CS+ and CS-
+  choose_CS1_rel_none <- rel_none * (1/N) * (1/N) * (1/2)
+  choose_CS0_rel_none <- rel_none * (1/N) * (1/N) * (1/2)
+
+  # "SZ is relevant"... the colour and texture type are assumed to be chosen
+  # at random, but the size depends on the utility calculations
+  choose_CS1_rel_SZ <- rel_SZ * (sum(utility_CS1[sz1,,]) / sum(utility_CS1)) * (1/N) * (1/2)
+  choose_CS0_rel_SZ <- rel_SZ * (sum(utility_CS0[sz0,,]) / sum(utility_CS0)) * (1/N) * (1/2)
+  
+  # "TT is relevant"... the texture type is chosen based on utility, size and texture
+  # value are both chosen completely at random
+  choose_CS1_rel_TT <- rel_TT * (sum(utility_CS1[,,1]) / sum(utility_CS1)) * (1/N) * (1/N)
+  choose_CS0_rel_TT <- rel_TT * (sum(utility_CS0[,,2]) / sum(utility_CS0)) * (1/N) * (1/N)
+   
+  # "TT & SZ" relevant... texture type and size matter, but details of texture don't
+  choose_CS1_rel_TT_SZ <- rel_TT_SZ * (sum(utility_CS1[sz1,,1]) / sum(utility_CS1)) * (1/N)
+  choose_CS0_rel_TT_SZ <- rel_TT_SZ * (sum(utility_CS0[sz0,,2]) / sum(utility_CS0)) * (1/N)
+  
+  # "TT & CH & BG"... everything about texture is relevant
+  choose_CS1_rel_notSZ <- rel_notSZ * (sum(utility_CS1[,bg1,1]) / sum(utility_CS1)) * (1/N)
+  choose_CS0_rel_notSZ <- rel_notSZ * (sum(utility_CS0[,ch0,2]) / sum(utility_CS0)) * (1/N)
+    
+  # everything
+  choose_CS1_rel_all <- rel_all * (utility_CS1[sz1,bg1,1] / sum(utility_CS1))
+  choose_CS0_rel_all <- rel_all * (utility_CS0[sz0,ch0,2] / sum(utility_CS0))
+  
+  # ... in these cases we have scenarios where one or both of the texture values is deemed
+  # relevant but the texture type itself is not. I'm not convinced that these aren't gross
+  # violations of Gricean pragmatics, but I've tried to write down what the sampling model
+  # looks like in such cases. To do this, what we have to assume is that the experimenter
+  # selects the texture type (BG or CH) without considering their usefulness as training 
+  # items. But once the TT is set, then (if the value is relevant) select the value by 
+  # considering the utility *conditional* on that texture type:
+   
+  # BG only
+  choose_CS1_rel_BG <- rel_BG * (1/2) * (sum(utility_CS1[,bg1,1]) / sum(utility_CS1[,,1])) * (1/N)
+  choose_CS0_rel_BG <- rel_BG * (1/2) * (1/N) * (1/N)
+  
+  # CH only
+  choose_CS1_rel_CH <- rel_CH * (1/2) * (1/N) * (1/N)
+  choose_CS0_rel_CH <- rel_CH * (1/2) * (sum(utility_CS0[,ch0,2]) / sum(utility_CS0[,,2])) * (1/N)
+  
+  # BG & CH
+  choose_CS1_rel_BG_CH <- rel_BG_CH * (1/2) * (sum(utility_CS1[,bg1,1]) / sum(utility_CS1[,,1])) * (1/N)
+  choose_CS0_rel_BG_CH <- rel_BG_CH * (1/2) * (sum(utility_CS0[,ch0,2]) / sum(utility_CS0[,,2])) * (1/N)
+  
+  # ... these cases are the same, but the size is also relevant so we take that into account
+  # after the texture is chosen
+  
+  # BG & SZ
+  choose_CS1_rel_SZ_BG <- rel_SZ_BG * (1/2) * (utility_CS1[sz1,bg1,1] / sum(utility_CS1[,,1]))
+  choose_CS0_rel_SZ_BG <- rel_SZ_BG * (1/2) * (sum(utility_CS0[sz0,,2]) / sum(utility_CS0[,,2])) * (1/N)
+  
+  # SZ & CH
+  choose_CS1_rel_SZ_CH <- rel_SZ_CH * (1/2) * (sum(utility_CS1[sz1,,1]) / sum(utility_CS1[,,1])) * (1/N)
+  choose_CS0_rel_SZ_CH <- rel_SZ_CH * (1/2) * (utility_CS0[sz0,ch0,2] / sum(utility_CS0[,,2]))
+  
+  # BG, SZ & CH (notTT)
+  choose_CS1_rel_notTT <- rel_notTT * (1/2) * (utility_CS1[sz1,bg1,1] / sum(utility_CS1[,,1]))
+  choose_CS0_rel_notTT <- rel_notTT * (1/2) * (utility_CS0[sz0,ch0,2] / sum(utility_CS0[,,2]))
+  
+  
+  # ... more cases that feel a little weird, where the TT is relevant and only ONE of the two
+  # texture values is relevant. It also leads to slightly odd models:
+  
+  # TT & CH
+  choose_CS1_rel_TT_CH <- rel_TT_CH * (sum(utility_CS1[,,1]) / sum(utility_CS1)) * (1/N) * (1/N) 
+  choose_CS0_rel_TT_CH <- rel_TT_CH * (sum(utility_CS0[,ch0,2]) / sum(utility_CS0)) * (1/N)  
+  
+  # TT & BG
+  choose_CS1_rel_TT_BG <- rel_TT_BG * (sum(utility_CS1[,bg1,1]) / sum(utility_CS1)) * (1/N)
+  choose_CS0_rel_TT_BG <- rel_TT_BG * (sum(utility_CS0[,,2]) / sum(utility_CS0)) * (1/N) * (1/N)
+ 
+  # as above but size is relevant too...
+ 
+  # TT, SZ & CH (notBG)
+  choose_CS1_rel_notBG <- rel_notBG * (sum(utility_CS1[sz1,,1]) / sum(utility_CS1)) * (1/N) 
+  choose_CS0_rel_notBG <- rel_notBG * (utility_CS0[sz0,ch0,2] / sum(utility_CS0))
+  
+  # TT, SZ & BG (notCH)
+  choose_CS1_rel_notCH <- rel_notCH * (utility_CS1[sz1,bg1,1] / sum(utility_CS1)) 
+  choose_CS0_rel_notCH <- rel_notCH * (sum(utility_CS0[sz0,,2]) / sum(utility_CS0)) * (1/N) 
+  
+  # "add" them together (though only one of these terms is non-zero) to obtain
+  # the probability of choosing this stimulus as the CS+ 
+  choose_CS1 <- choose_CS1_rel_none + choose_CS1_rel_TT + choose_CS1_rel_SZ + choose_CS1_rel_BG + choose_CS1_rel_CH + choose_CS1_rel_TT_CH + choose_CS1_rel_TT_BG + choose_CS1_rel_TT_CH + choose_CS1_rel_SZ_BG + choose_CS1_rel_SZ_CH + choose_CS1_rel_BG_CH + choose_CS1_rel_notTT + choose_CS1_rel_notSZ + choose_CS1_rel_notBG + choose_CS1_rel_notCH + choose_CS1_rel_all 
+  
+  # "add" them together (though only one of these terms is non-zero) to obtain
+  # the probability of choosing this stimulus as the CS- 
+  choose_CS0 <- choose_CS0_rel_none + choose_CS0_rel_TT + choose_CS0_rel_SZ + choose_CS0_rel_BG + choose_CS0_rel_CH + choose_CS0_rel_TT_CH + choose_CS0_rel_TT_BG + choose_CS0_rel_TT_CH + choose_CS0_rel_SZ_BG + choose_CS0_rel_SZ_CH + choose_CS0_rel_BG_CH + choose_CS0_rel_notTT + choose_CS0_rel_notSZ + choose_CS0_rel_notBG + choose_CS0_rel_notCH + choose_CS0_rel_all 
+
+  # likelihoods  
+  likelihood_CS1 <- choose_CS1 * outcome_CS1
+  likelihood_CS0 <- choose_CS0 * outcome_CS0
+
+}

@@ -1,0 +1,71 @@
+### 4 relevance variables -> 16 possible scenarios ###
+
+# The choice probability depends on what the learner thinks that
+# the "teacher" considers relevant to the problem, so for my sanity
+# we'll create variables for each case. These are all the logically 
+# possible cases, though many of the "relevant" cases are nonsensical 
+# in some stimulus conditions, so they end up being given likelihood 
+# zero because the stimuli presented are gross violations of Gricean
+# maxims/ Bu for now let's just list the logical possibilities:
+
+# nothing
+rel_none <- (1-TT_relevant) * (1-SZ_relevant) * (1-BG_relevant) * (1-CH_relevant)
+
+# one relevant properties
+rel_TT <- TT_relevant * (1-SZ_relevant) * (1-BG_relevant) * (1-CH_relevant)
+rel_SZ <- (1-TT_relevant) * SZ_relevant * (1-BG_relevant) * (1-CH_relevant)
+rel_BG <- (1-TT_relevant) * (1-SZ_relevant) * BG_relevant * (1-CH_relevant)
+rel_CH <- (1-TT_relevant) * (1-SZ_relevant) * (1-BG_relevant) * CH_relevant
+
+# two relevant properties
+rel_TT_SZ <- TT_relevant * SZ_relevant * (1-BG_relevant) * (1-CH_relevant)
+rel_TT_BG <- TT_relevant * (1-SZ_relevant) * BG_relevant * (1-CH_relevant)
+rel_TT_CH <- TT_relevant * (1-SZ_relevant) * (1-BG_relevant) * CH_relevant
+rel_SZ_BG <- (1-TT_relevant) * SZ_relevant * BG_relevant * (1-CH_relevant)
+rel_SZ_CH <- (1-TT_relevant) * SZ_relevant * (1-BG_relevant) * CH_relevant
+rel_BG_CH <- (1-TT_relevant) * (1-SZ_relevant) * BG_relevant * CH_relevant
+
+# three relevant properties
+rel_notTT <- (1-TT_relevant) * SZ_relevant * BG_relevant * CH_relevant
+rel_notSZ <- TT_relevant * (1-SZ_relevant) * BG_relevant * CH_relevant
+rel_notBG <- TT_relevant * SZ_relevant * (1-BG_relevant) * CH_relevant
+rel_notCH <- TT_relevant * SZ_relevant * BG_relevant * (1-CH_relevant)
+
+# everything is relevant
+rel_all <- TT_relevant * SZ_relevant * BG_relevant * CH_relevant
+
+### Utility function for intentional sampling ###
+  
+# What utility does an intentional sampler assign to each stimulus, if their goal
+# is to select a CS+ or a CS-? There are many possibilities, but a simple one is
+# to assume tha the utility is proportional to the probability that this stimulus
+# yields the relevant outcome! As with almost everything in the model, this has 
+# the advantage of not leading to a proliferation of parameters, though one could
+# certainly argue that a helpful teacher is likely to exaggerate this somewhat
+# with a disproportionate focus on the extreme stimuli. However, for simplicity
+# we assume that the teacher probability matches. Note that this is only applicable
+# when the learner treats at least one property as "communicatively relevant". 
+for(sh in 1:grain) { # shape value
+  for(c in 1:grain) { # colour/checker value
+    for(v in 1:2) { # texture type
+      utility_CS1[sh,c,v] <- association[sh,c,v] # probability of a shock        
+      utility_CS0[sh,c,v] <- 1 - association[sh,c,v] # probability of no-shock
+    }
+  }
+}
+
+### Likelihood infction ###
+
+# In the specific files for the CS+ and the CS- stimuli, we create a variable
+# corresponding to the joint likelihood that "the experiment selected this S" and 
+# "the outcome was this value (+ or -)". Apply that to each training trial:
+p1 <- eps + (1-eps) * likelihood_CS1
+p0 <- eps + (1-eps) * likelihood_CS0
+for(i in 1:ntrials) {
+  cs1[i] ~ dbern(p1) # the CS+
+  cs0[i] ~ dbern(p0) # the CS- (if it exists: if not this is assumed 1)
+}
+  
+# Numerical error fix
+eps <- .0000000001
+

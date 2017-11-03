@@ -1,0 +1,106 @@
+model {
+
+  ###########################
+
+  PRIORHERE
+  
+  ###########################
+  
+  RELEVANCEHERE
+  
+  ###########################
+  
+  LIKELIHOODHERE
+  
+  ###########################
+  
+  # Content specific to the near CS- condition
+  
+  N <- 11
+  
+  bg1 <- 6 # colour of the CS+
+  bg0 <- 4 # colour of the CS-
+  
+  sz1 <- 6 # size of the CS+
+  sz0 <- 6 # size of the CS-
+  
+  # Calculate the likelihood of the CS+ & CS- given what the learner believes about
+  # (a) the relevance of difference stimulus properties, (b) the associative
+  # strength of the stimulus. Note that this likelihood has two parts: the 
+  # probability that the experiment would "choose" this particular stimulus,
+  # and the probability that this stimulus would lead to the "outcome".
+
+  # The outcome probability is read straight off the map. As a reminder,
+  # 1st index = SZ, 2nd index = value of (BG or CH), 3rd index = TT
+  outcome_CS1 <- association[sz1, bg1, 1]
+  outcome_CS0 <- 1 - association[sz0, bg0, 1]
+  
+  # The model for the "choose" action. It's important to keep in mind that
+  # in this condition, participants NEVER see CH or TT in any meaningful sense, so
+  # all the calculations are made relative to a stimulus space that does not
+  # include these dimensions...
+  
+  # "NOTHING is relevant"... assume items is randomly chosen from the stimulus 
+  # space. Because the checkered stimuli are non existent, the size and 
+  # bluegreenness are both randomly selected, but we don't "choose" a TT
+  choose_CS1_rel_none <- rel_none * (1/N) * (1/N)
+  choose_CS0_rel_none <- rel_none * (1/N) * (1/N)  
+  
+  # "SZ is relevant"... the colour is assumed to be randomly selected, but 
+  # the size of the item is assumed to be based on the average utility of items
+  # of this size, relative to all items that belong to the "extant" stimulus
+  # space:
+  choose_CS1_rel_SZ <- rel_SZ * (sum(utility_CS1[sz1,,1]) / sum(utility_CS1[,,1])) * (1/N)
+  choose_CS0_rel_SZ <- rel_SZ * (sum(utility_CS0[sz0,,1]) / sum(utility_CS0[,,1])) * (1/N)
+  
+  # "BG is relevant"... works in much the same way:
+  choose_CS1_rel_BG <- rel_BG * (sum(utility_CS1[,bg1,1]) / sum(utility_CS1[,,1])) * (1/N)
+  choose_CS0_rel_BG <- rel_BG * (sum(utility_CS0[,bg0,1]) / sum(utility_CS0[,,1])) * (1/N)
+  
+  # "BG & SZ are both relevant:
+  choose_CS1_rel_SZ_BG <- rel_SZ_BG * utility_CS1[sz1,bg1,1] / sum(utility_CS1[,,1])
+  choose_CS0_rel_SZ_BG <- rel_SZ_BG * utility_CS0[sz0,bg0,1] / sum(utility_CS0[,,1])
+  
+  # cases where we assign communicative relevance to non-existent stimulus dimensions 
+  # (in this case TT and CH) must be deemed impossible as gross violations of Gricean
+  # maxims...
+  choose_CS1_rel_TT <- rel_TT * eps # CS+
+  choose_CS1_rel_CH <- rel_CH * eps
+  choose_CS1_rel_TT_CH <- rel_TT_CH * eps
+  choose_CS1_rel_TT_BG <- rel_TT_BG * eps
+  choose_CS1_rel_TT_SZ <- rel_TT_SZ * eps
+  choose_CS1_rel_SZ_CH <- rel_SZ_CH * eps
+  choose_CS1_rel_BG_CH <- rel_BG_CH * eps
+  choose_CS1_rel_notTT <- rel_notTT * eps
+  choose_CS1_rel_notSZ <- rel_notSZ * eps
+  choose_CS1_rel_notBG <- rel_notBG * eps
+  choose_CS1_rel_notCH <- rel_notCH * eps
+  choose_CS1_rel_all <- rel_all * eps
+  
+  choose_CS0_rel_TT <- rel_TT * eps # CS-
+  choose_CS0_rel_CH <- rel_CH * eps
+  choose_CS0_rel_TT_CH <- rel_TT_CH * eps
+  choose_CS0_rel_TT_BG <- rel_TT_BG * eps
+  choose_CS0_rel_TT_SZ <- rel_TT_SZ * eps
+  choose_CS0_rel_SZ_CH <- rel_SZ_CH * eps
+  choose_CS0_rel_BG_CH <- rel_BG_CH * eps
+  choose_CS0_rel_notTT <- rel_notTT * eps
+  choose_CS0_rel_notSZ <- rel_notSZ * eps
+  choose_CS0_rel_notBG <- rel_notBG * eps
+  choose_CS0_rel_notCH <- rel_notCH * eps
+  choose_CS0_rel_all <- rel_all * eps
+  
+  # "add" them together (though only one of these terms is non-zero) to obtain
+  # the probability of choosing this stimulus as the CS+ 
+  choose_CS1 <- choose_CS1_rel_none + choose_CS1_rel_TT + choose_CS1_rel_SZ + choose_CS1_rel_BG + choose_CS1_rel_CH + choose_CS1_rel_TT_CH + choose_CS1_rel_TT_BG + choose_CS1_rel_TT_CH + choose_CS1_rel_SZ_BG + choose_CS1_rel_SZ_CH + choose_CS1_rel_BG_CH + choose_CS1_rel_notTT + choose_CS1_rel_notSZ + choose_CS1_rel_notBG + choose_CS1_rel_notCH + choose_CS1_rel_all 
+  
+  # "add" them together (though only one of these terms is non-zero) to obtain
+  # the probability of choosing this stimulus as the CS- 
+  choose_CS0 <- choose_CS0_rel_none + choose_CS0_rel_TT + choose_CS0_rel_SZ + choose_CS0_rel_BG + choose_CS0_rel_CH + choose_CS0_rel_TT_CH + choose_CS0_rel_TT_BG + choose_CS0_rel_TT_CH + choose_CS0_rel_SZ_BG + choose_CS0_rel_SZ_CH + choose_CS0_rel_BG_CH + choose_CS0_rel_notTT + choose_CS0_rel_notSZ + choose_CS0_rel_notBG + choose_CS0_rel_notCH + choose_CS0_rel_all 
+
+  # likelihoods  
+  likelihood_CS1 <- choose_CS1 * outcome_CS1
+  likelihood_CS0 <- choose_CS0 * outcome_CS0
+
+  
+}

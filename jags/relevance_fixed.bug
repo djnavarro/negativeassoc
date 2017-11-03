@@ -1,0 +1,6 @@
+### relevance fixed by input ###
+
+TT_relevant <- input_rel[1] 
+SZ_relevant <- input_rel[2]
+BG_relevant <- input_rel[3] 
+CH_relevant <- input_rel[4] 

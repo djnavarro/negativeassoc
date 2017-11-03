@@ -1,0 +1,166 @@
+
+# The likelihood is a variation of strong/weak sampling that is inspired by pedagogical sampling
+# and rational speech act models. It's a little less than satisfying, to be honest, but at least
+# it captures the right qualitative idea? In the text below SZ = size, BG = bluegreen texture, 
+# CH = checkered textures, TT = texture type
+#
+# During training, the learner observes that...
+#  - Single CS+ condition: "SZ exists", "BG exists" 
+#  - Near CS- condition: "SZ exist", "BG exists", "BG can vary"
+#  - Far CS- condition: "SZ exists", "BG exists", "CH exists", "TT exists" ,"TT can vary"
+#
+# where "exists" is really just shorthand for "exists & is included as part of the task".
+#   
+# The test trials also implicitly tell the learner that...
+#  - Single CS+: "SZ can vary", "BG can vary"
+#  - Near CS-: "SZ can vary", "BG can vary" 
+#  - Far CS-: "SZ can vary", "TT can vary"
+#
+# This can be redescribed in the following way:
+#
+# The existence observations:
+#   - Single CS+: SZ, BG
+#   - Near CS-: SZ, BG
+#   - Far CS-: SZ, BG, CH, TT
+#
+# Can-it-vary-at-all observations:
+#   - Single CS+: SZ, BG
+#   - Near CS-: SZ, BG
+#   - Far CS-: SZ, BG, TT
+#
+# Does-it-vary-during-training observations:
+#   - Single CS+: [nothing]
+#   - Near CS-: BG
+#   - Far CS-: TT
+# 
+# Under weak sampling, all of this is deemed to be uninformative. Under intentional sampling it
+# is assumed to communicate something about the goals of the experimenter. The qualitative 
+# desiderata for a communicative model: (a) if a feature never appears it is necessarily
+# irrelevant, (b) if a feature is shown to vary during training, is very likely to be relevant
+# (c) if a feature is shown to vary at test it might be relevant.
+#
+# A generative model that satisfies these desiderata:
+#   - If a feature is relevant it necessarily appears
+#   - If a feature is relevant 
+
+
+### parameters ####
+
+# everything that exists is relevant
+s_base <- .001
+r_base <- .999
+
+# ensures no "learning from training variation"
+s_train <- .5
+r_train <- .00001
+
+# ensures no "learning relevance from the test trials"
+s_test <- .5 
+r_test <- .000001
+
+### relevance prior ###
+
+# A very general version of the prior allows each property to have different 
+# prior probabilities of being relevant to a communicative goal (all fixed at
+# zero for weak sampling...)
+TT_relevant ~ dbern(r_TT)
+SZ_relevant ~ dbern(r_SZ)
+BG_relevant ~ dbern(r_BG)
+CH_relevant ~ dbern(r_CH)
+
+#### model for the "existence/inclusion" information ####
+
+# A probabilistic model for the "existence" data assumes that relevant properties
+# are necessarily included, but there's some probability of including a property for
+# incidental "spurious - s" reasons:
+TT_inclusionprob <- TT_relevant + (1 - TT_relevant) * s_TT
+SZ_inclusionprob <- SZ_relevant + (1 - SZ_relevant) * s_SZ
+BG_inclusionprob <- BG_relevant + (1 - BG_relevant) * s_BG
+CH_inclusionprob <- CH_relevant + (1 - CH_relevant) * s_CH
+
+# Use this to assign probability to the "existence" information. 
+TT_exists ~ dbern(TT_inclusionprob)
+SZ_exists ~ dbern(SZ_inclusionprob)
+BG_exists ~ dbern(BG_inclusionprob)
+CH_exists ~ dbern(CH_inclusionprob)
+
+# The model above has a lot of degrees of freedom. I've written it that 
+# way to highlight the number of ways in which learner biases could shift
+# across different tasks. However, for the sake of simplicity let's just
+# reduce that complexity:
+
+# all properties equally likely to be relevant a priori
+r_TT <- r_base 
+r_SZ <- r_base
+r_BG <- r_base
+r_CH <- r_base
+
+# all properties equally likely to be incidental inclusions a priori
+s_TT <- s_base 
+s_SZ <- s_base
+s_BG <- s_base
+s_CH <- s_base
+
+
+#### model for the "varies during training" information ####
+
+# The learner also accrues some information by being told that a particular 
+# characteristic can vary. In this code I try to implement it in a fully
+# general way that maintains a distinction between what the learner is shown
+# in training versus what they are shown at test. Here's the training part, 
+# which assumes that variation can occur "just because" (base) but it can occur
+# because the feaure is relevant to the learning problem (rel). Note that 
+# the model also acknowledges that a feature can't vary if it doesn't exist:
+TT_trainvaryprob <- TT_exists * (varytrainbase_TT + (1-varytrainbase_TT) * TT_relevant * varytrainrel_TT)
+SZ_trainvaryprob <- SZ_exists * (varytrainbase_SZ + (1-varytrainbase_SZ) * SZ_relevant * varytrainrel_SZ)
+BG_trainvaryprob <- BG_exists * (varytrainbase_BG + (1-varytrainbase_BG) * BG_relevant * varytrainrel_BG)
+CH_trainvaryprob <- CH_exists * (varytrainbase_CH + (1-varytrainbase_CH) * CH_relevant * varytrainrel_CH)
+
+# Assign probability to the observations:
+TT_trainvary ~ dbern(TT_trainvaryprob)
+SZ_trainvary ~ dbern(SZ_trainvaryprob)
+BG_trainvary ~ dbern(BG_trainvaryprob)
+CH_trainvary ~ dbern(CH_trainvaryprob)
+
+# again, fix parameters: all properties equally likely to vary "just because"
+varytrainbase_TT <- s_train
+varytrainbase_SZ <- s_train
+varytrainbase_BG <- s_train
+varytrainbase_CH <- s_train
+
+# all properties equally likely to be varied due to their relevance
+varytrainrel_TT <- r_train
+varytrainrel_SZ <- r_train
+varytrainrel_BG <- r_train
+varytrainrel_CH <- r_train
+
+#### model for the "varies during test" information ####
+
+# The model for variation at test is exactly the same as the model for variation during
+# training. In principle the learner might make different assumptions about the different
+# roles of training and test, but the core idea is the same: relevant items are more likely
+# to be varied, but there is some degree of variation "just because". As before, the 
+# model notes that you can't vary a feature that doesn't exist!
+
+TT_testvaryprob <- TT_exists * (varytestbase_TT + (1-varytestbase_TT) * TT_relevant * varytestrel_TT)
+SZ_testvaryprob <- SZ_exists * (varytestbase_SZ + (1-varytestbase_SZ) * SZ_relevant * varytestrel_SZ)
+BG_testvaryprob <- BG_exists * (varytestbase_BG + (1-varytestbase_BG) * BG_relevant * varytestrel_BG)
+CH_testvaryprob <- CH_exists * (varytestbase_CH + (1-varytestbase_CH) * CH_relevant * varytestrel_CH)
+
+# Assign probability to the observations:
+TT_testvary ~ dbern(TT_testvaryprob)
+SZ_testvary ~ dbern(SZ_testvaryprob)
+BG_testvary ~ dbern(BG_testvaryprob)
+CH_testvary ~ dbern(CH_testvaryprob)
+
+# again, fix parameters: all properties equally likely to vary "just because"
+varytestbase_TT <- s_test
+varytestbase_SZ <- s_test
+varytestbase_BG <- s_test
+varytestbase_CH <- s_test
+
+# all properties equally likely to be varied due to their relevance
+varytestrel_TT <- r_test
+varytestrel_SZ <- r_test
+varytestrel_BG <- r_test
+varytestrel_CH <- r_test
